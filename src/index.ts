@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
 
 const SUPABASE_URL = 'https://onqxflwfkexitipylixc.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_P6xFktXhhIjgC4hVxD6FxA_EbPl-clT';
+const SUPABASE_ANON_KEY = 'sb_publishable_7Ccv9D3N097xwrqjuJQ7CA_kiFWbxH6';
 
 interface StreamResult {
   name: string | null;
