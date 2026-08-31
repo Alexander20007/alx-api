@@ -1,120 +1,56 @@
-// ============================================
-// API DE CANAIS - 100% SUPABASE
-// ============================================
-
 const SUPABASE_URL = 'https://onqxflwfkexitipylixc.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_P6xFktXhhIjgC4hVxD6FxA_EbPl-clT';
 
-interface Canal {
-    name: string;
-    logo: string;
-    group: string;
-    stream: string;
-}
-
-let canaisCache: Canal[] | null = null;
+let canaisCache: any[] | null = null;
 let ultimaAtualizacao = 0;
 const TEMPO_CACHE = 60000;
 
-// ============================================
-// 1. BUSCAR TODOS OS LINKS DO SUPABASE
-// ============================================
 async function buscarLinks(): Promise<string[]> {
     try {
         const response = await fetch(`${SUPABASE_URL}/rest/v1/canais_links?select=url&ativo=eq.true&order=ordem.asc`, {
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-            }
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
         });
-
-        if (!response.ok) {
-            console.error('❌ Erro ao buscar links:', response.status);
-            return [];
-        }
-
+        if (!response.ok) return [];
         const data: any[] = await response.json();
         return data.map((item: any) => item.url).filter(Boolean);
-    } catch (error) {
-        console.error('❌ Erro ao buscar links:', error);
-        return [];
-    }
+    } catch { return []; }
 }
 
-// ============================================
-// 2. BAIXAR E PROCESSAR UMA LISTA M3U
-// ============================================
-async function baixarEProcessarLista(url: string): Promise<Canal[]> {
+async function baixarEProcessarLista(url: string): Promise<any[]> {
     try {
-        console.log(`🔄 Baixando: ${url}`);
         const response = await fetch(url);
         if (!response.ok) return [];
-
         const texto = await response.text();
         const linhas = texto.split('\n');
-
-        const canais: Canal[] = [];
+        const canais: any[] = [];
         let canalAtual: any = null;
-
         for (const linha of linhas) {
             const linhaTrim = linha.trim();
-            
             if (linhaTrim.startsWith('#EXTINF')) {
                 const nomeMatch = linhaTrim.match(/,([^,]+)$/);
                 const logoMatch = linhaTrim.match(/tvg-logo="([^"]*)"/);
                 const grupoMatch = linhaTrim.match(/group-title="([^"]*)"/);
-                
-                canalAtual = {
-                    name: nomeMatch ? nomeMatch[1] : 'Canal',
-                    logo: logoMatch ? logoMatch[1] : '',
-                    group: grupoMatch ? grupoMatch[1] : 'Geral',
-                    stream: null as string | null
-                };
+                canalAtual = { name: nomeMatch ? nomeMatch[1] : 'Canal', logo: logoMatch ? logoMatch[1] : '', group: grupoMatch ? grupoMatch[1] : 'Geral', stream: null as string | null };
             }
-            
             if (linhaTrim.startsWith('http') && canalAtual) {
                 canalAtual.stream = linhaTrim;
-                canais.push(canalAtual as Canal);
+                canais.push(canalAtual);
                 canalAtual = null;
             }
         }
-
-        console.log(`✅ ${canais.length} canais de ${url}`);
         return canais;
-
-    } catch (error: any) {
-        console.error(`❌ Erro em ${url}:`, error.message);
-        return [];
-    }
+    } catch { return []; }
 }
 
-// ============================================
-// 3. CARREGAR CANAIS DE TODOS OS LINKS
-// ============================================
-async function carregarCanais(): Promise<Canal[]> {
-    if (canaisCache && (Date.now() - ultimaAtualizacao) < TEMPO_CACHE) {
-        return canaisCache;
-    }
-
+async function carregarCanais(): Promise<any[]> {
+    if (canaisCache && (Date.now() - ultimaAtualizacao) < TEMPO_CACHE) return canaisCache;
     const links = await buscarLinks();
-
-    // SE NÃO TIVER LINKS NO SUPABASE, RETORNA VAZIO (NÃO USA FALLBACK)
-    if (links.length === 0) {
-        console.log('⚠️ Nenhum link encontrado no Supabase');
-        canaisCache = [];
-        ultimaAtualizacao = Date.now();
-        return [];
-    }
-
-    console.log(`📡 ${links.length} links encontrados`);
-
-    let todosCanais: Canal[] = [];
+    if (links.length === 0) { canaisCache = []; ultimaAtualizacao = Date.now(); return []; }
+    let todosCanais: any[] = [];
     for (const link of links) {
         const canais = await baixarEProcessarLista(link);
         todosCanais = [...todosCanais, ...canais];
     }
-
-    // Remover duplicatas
     const seen = new Set<string>();
     const unicos = todosCanais.filter(canal => {
         const key = canal.name + canal.stream;
@@ -122,36 +58,20 @@ async function carregarCanais(): Promise<Canal[]> {
         seen.add(key);
         return true;
     });
-
-    console.log(`📊 Total: ${unicos.length} canais únicos`);
     canaisCache = unicos;
     ultimaAtualizacao = Date.now();
     return unicos;
 }
 
-// ============================================
-// 4. FUNÇÕES EXPORTADAS
-// ============================================
 export async function buscarCanais(query?: string, grupo?: string, limit?: number) {
     const todos = await carregarCanais();
     let resultados = todos;
-    
-    if (grupo) {
-        resultados = resultados.filter(c => c.group === grupo);
-    }
-    
+    if (grupo) resultados = resultados.filter(c => c.group === grupo);
     if (query) {
         const termo = query.toLowerCase();
-        resultados = resultados.filter(c => 
-            c.name.toLowerCase().includes(termo) ||
-            (c.group && c.group.toLowerCase().includes(termo))
-        );
+        resultados = resultados.filter(c => c.name.toLowerCase().includes(termo) || (c.group && c.group.toLowerCase().includes(termo)));
     }
-    
-    if (limit) {
-        resultados = resultados.slice(0, limit);
-    }
-    
+    if (limit) resultados = resultados.slice(0, limit);
     return { total: resultados.length, canais: resultados };
 }
 
