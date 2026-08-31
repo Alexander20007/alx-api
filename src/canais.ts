@@ -1,19 +1,22 @@
-const SUPABASE_URL = 'https://onqxflwfkexitipylixc.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_7Ccv9D3N097xwrqjuJQ7CA_kiFWbxH6';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, TEMPO_CACHE } from './config.js';
 
 let canaisCache: any[] | null = null;
 let ultimaAtualizacao = 0;
-const TEMPO_CACHE = 60000;
 
 async function buscarLinks(): Promise<string[]> {
     try {
         const response = await fetch(`${SUPABASE_URL}/rest/v1/canais_links?select=url&ativo=eq.true&order=ordem.asc`, {
-            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
         });
         if (!response.ok) return [];
-        const data: any[] = await response.json();
+        const data = await response.json();
         return data.map((item: any) => item.url).filter(Boolean);
-    } catch { return []; }
+    } catch {
+        return [];
+    }
 }
 
 async function baixarEProcessarLista(url: string): Promise<any[]> {
@@ -30,7 +33,12 @@ async function baixarEProcessarLista(url: string): Promise<any[]> {
                 const nomeMatch = linhaTrim.match(/,([^,]+)$/);
                 const logoMatch = linhaTrim.match(/tvg-logo="([^"]*)"/);
                 const grupoMatch = linhaTrim.match(/group-title="([^"]*)"/);
-                canalAtual = { name: nomeMatch ? nomeMatch[1] : 'Canal', logo: logoMatch ? logoMatch[1] : '', group: grupoMatch ? grupoMatch[1] : 'Geral', stream: null as string | null };
+                canalAtual = {
+                    name: nomeMatch ? nomeMatch[1] : 'Canal',
+                    logo: logoMatch ? logoMatch[1] : '',
+                    group: grupoMatch ? grupoMatch[1] : 'Geral',
+                    stream: null as string | null
+                };
             }
             if (linhaTrim.startsWith('http') && canalAtual) {
                 canalAtual.stream = linhaTrim;
@@ -39,13 +47,15 @@ async function baixarEProcessarLista(url: string): Promise<any[]> {
             }
         }
         return canais;
-    } catch { return []; }
+    } catch {
+        return [];
+    }
 }
 
 async function carregarCanais(): Promise<any[]> {
     if (canaisCache && (Date.now() - ultimaAtualizacao) < TEMPO_CACHE) return canaisCache;
     const links = await buscarLinks();
-    if (links.length === 0) { canaisCache = []; ultimaAtualizacao = Date.now(); return []; }
+    if (links.length === 0) return [];
     let todosCanais: any[] = [];
     for (const link of links) {
         const canais = await baixarEProcessarLista(link);

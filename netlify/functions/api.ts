@@ -2,7 +2,7 @@ import { Handler } from '@netlify/functions';
 import tmdbScrape from '../../src/index.js';
 
 export const handler: Handler = async (event) => {
-    const { tmdbId, type, season, episode } = event.queryStringParameters || {};
+    const { tmdbId, type } = event.queryStringParameters || {};
 
     if (!tmdbId || !type) {
         return {
